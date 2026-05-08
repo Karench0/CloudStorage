@@ -1,0 +1,36 @@
+{{ template "header" . }}
+
+<div class="row justify-content-center align-items-center" style="min-height: 70vh;">
+    <div class="col-md-5 col-lg-4">
+        <div class="card border-0 shadow-sm">
+            <div class="card-body p-4">
+                <h3 class="text-center fw-bold mb-4">Регистрация</h3>
+                
+                {{ if .error }}
+                <div class="alert alert-danger py-2 small">{{ .error }}</div>
+                {{ end }}
+
+                <form method="post">
+                    <div class="mb-3">
+                        <label class="form-label text-muted small fw-bold">Придумайте логин</label>
+                        <input type="text" name="username" class="form-control" required placeholder="Ваш никнейм">
+                    </div>
+                    
+                    <div class="mb-4">
+                        <label class="form-label text-muted small fw-bold">Пароль</label>
+                        <input type="password" name="password" class="form-control" required placeholder="Минимум 6 символов">
+                    </div>
+                    
+                    <button type="submit" class="btn btn-primary w-100 fw-bold py-2">Зарегистрироваться</button>
+                </form>
+                
+                <div class="text-center mt-4">
+                    <span class="text-muted small">Уже есть аккаунт?</span>
+                    <a href="/login" class="small fw-bold text-decoration-none">Войти</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{{ template "footer" . }}

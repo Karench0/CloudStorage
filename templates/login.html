@@ -1,0 +1,39 @@
+{{ template "header" . }}
+
+<div class="row justify-content-center align-items-center" style="min-height: 70vh;">
+    <div class="col-md-5 col-lg-4">
+        <div class="card border-0 shadow-sm">
+            <div class="card-body p-4">
+                <h3 class="text-center fw-bold mb-4">Вход</h3>
+                
+                {{ if .error }}
+                <div class="alert alert-danger d-flex align-items-center" role="alert">
+                    <i class="bi bi-exclamation-octagon-fill me-2"></i>
+                    <div>{{ .error }}</div>
+                </div>
+                {{ end }}
+
+                <form method="post">
+                    <div class="mb-3">
+                        <label class="form-label text-muted small fw-bold">Логин</label>
+                        <input type="text" name="username" class="form-control" required placeholder="username">
+                    </div>
+                    
+                    <div class="mb-4">
+                        <label class="form-label text-muted small fw-bold">Пароль</label>
+                        <input type="password" name="password" class="form-control" required placeholder="••••••••">
+                    </div>
+                    
+                    <button type="submit" class="btn btn-primary w-100 fw-bold py-2">Войти</button>
+                </form>
+                
+                <div class="text-center mt-4">
+                    <span class="text-muted small">Нет аккаунта?</span>
+                    <a href="/registration" class="small fw-bold text-decoration-none">Создать</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{{ template "footer" . }}
