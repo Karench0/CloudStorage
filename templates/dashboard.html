@@ -2,31 +2,86 @@
 
 <div class="row g-4">
     <div class="col-md-3">
-        <div class="d-grid gap-2">
-            <button class="btn btn-primary fw-bold shadow-sm py-2">
-                <i class="bi bi-cloud-arrow-up-fill me-2"></i> Загрузить файл
+        <div class="d-grid gap-2 mb-3">
+            <button class="btn btn-primary fw-bold shadow-sm py-2" data-bs-toggle="modal" data-bs-target="#createFolderModal">
+                <i class="bi bi-folder-plus me-2"></i> Создать папку
             </button>
-            <div class="list-group list-group-flush mt-3 small shadow-sm rounded">
-                <a href="#" class="list-group-item list-group-item-action active">
-                    <i class="bi bi-files me-2"></i> Мои файлы
-                </a>
-                <a href="#" class="list-group-item list-group-item-action text-muted">
-                    <i class="bi bi-star me-2"></i> Избранное
-                </a>
-                <a href="#" class="list-group-item list-group-item-action text-muted">
-                    <i class="bi bi-trash me-2"></i> Корзина
-                </a>
+        </div>
+
+        {{if .Stats}}
+        <div class="card border-0 shadow-sm mb-3">
+            <div class="card-body py-3">
+                <h6 class="text-muted text-uppercase small fw-bold mb-3">Хранилище</h6>
+                <div class="d-flex justify-content-between small mb-2">
+                    <span><i class="bi bi-file-earmark me-1"></i> Файлов</span>
+                    <strong>{{.Stats.FileCount}}</strong>
+                </div>
+                <div class="d-flex justify-content-between small mb-2">
+                    <span><i class="bi bi-folder me-1"></i> Папок</span>
+                    <strong>{{.Stats.FolderCount}}</strong>
+                </div>
+                <div class="d-flex justify-content-between small">
+                    <span><i class="bi bi-hdd me-1"></i> Занято</span>
+                    <strong>{{formatBytes .Stats.TotalBytes}}</strong>
+                </div>
+            </div>
+        </div>
+        {{end}}
+
+        <div class="card border-0 shadow-sm">
+            <div class="card-body py-3">
+                <label for="fileSearch" class="form-label small text-muted text-uppercase fw-bold mb-2">Поиск</label>
+                <input type="search" id="fileSearch" class="form-control form-control-sm" placeholder="Имя файла или папки...">
+                <label for="fileSort" class="form-label small text-muted text-uppercase fw-bold mb-2 mt-3">Сортировка</label>
+                <select id="fileSort" class="form-select form-select-sm">
+                    <option value="date-desc">Сначала новые</option>
+                    <option value="date-asc">Сначала старые</option>
+                    <option value="name-asc">По имени (А–Я)</option>
+                    <option value="name-desc">По имени (Я–А)</option>
+                    <option value="size-desc">По размеру</option>
+                </select>
             </div>
         </div>
     </div>
 
     <div class="col-md-9">
+        {{if .CurrentDir}}
+        <div class="mb-3 p-3 bg-light rounded">
+            <a href="/dashboard" class="text-decoration-none">Главная</a>
+            {{range .Breadcrumbs}}
+            <span class="mx-2">/</span>
+            {{if eq .ID $.CurrentDir.ID}}
+            <strong>{{.Name}}</strong>
+            {{else}}
+            <a href="/folder/{{.ID}}" class="text-decoration-none">{{.Name}}</a>
+            {{end}}
+            {{end}}
+        </div>
+        {{end}}
+
+        <form id="uploadForm" action="/upload{{if .CurrentDir}}?dirID={{.CurrentDir.ID}}{{end}}" method="POST" enctype="multipart/form-data" class="mb-4">
+            {{if .CurrentDir}}
+            <input type="hidden" name="dirID" value="{{.CurrentDir.ID}}">
+            {{end}}
+            <div id="uploadZone" class="upload-zone p-1 rounded"{{if .UploadError}} data-upload-error="{{.UploadError}}"{{end}}>
+                <div class="input-group shadow-sm">
+                    <input type="file" name="file" id="file" class="form-control" multiple>
+                    <button type="submit" class="btn btn-outline-primary fw-medium">
+                        <i class="bi bi-cloud-arrow-up-fill me-1"></i> Загрузить
+                    </button>
+                </div>
+                <div class="form-text text-muted mt-1">Можно выбрать несколько файлов сразу</div>
+                <div id="uploadErrorText" class="form-text text-danger fw-medium mt-2 d-none" role="alert"></div>
+            </div>
+        </form>
+
         <div class="card border-0 shadow-sm overflow-hidden">
-            <div class="card-header bg-white py-3 border-bottom-0">
+            <div class="card-header bg-white py-3 border-bottom-0 d-flex justify-content-between align-items-center">
                 <h5 class="mb-0 fw-bold">Ваши файлы</h5>
+                <span id="visibleCount" class="badge text-bg-light text-muted"></span>
             </div>
             <div class="table-responsive">
-                <table class="table table-hover align-middle mb-0">
+                <table class="table table-hover align-middle mb-0" id="filesTable">
                     <thead class="table-light">
                         <tr class="small text-muted text-uppercase">
                             <th class="ps-4">Название</th>
@@ -35,32 +90,418 @@
                             <th class="text-end pe-4">Действия</th>
                         </tr>
                     </thead>
-                    <tbody>
-                        <!-- <tr>
+                    <tbody id="filesTableBody">
+                        {{range .Directories}}
+                        <tr class="browse-row folder-row"
+                            data-href="/folder/{{.ID}}"
+                            data-name="{{.Name}}"
+                            data-sort-name="{{lower .Name}}"
+                            data-sort-date="{{.CreatedAt.Unix}}"
+                            data-sort-size="0"
+                            role="button"
+                            tabindex="0"
+                            title="Открыть папку">
                             <td class="ps-4">
-                                <i class="bi bi-file-earmark-pdf text-danger me-2"></i>
-                                <span class="fw-medium">Курсовой_проект.pdf</span>
+                                <i class="bi bi-folder-fill text-warning fs-5 me-2 align-middle"></i>
+                                <span class="fw-medium">{{.Name}}</span>
                             </td>
-                            <td class="text-muted small">2.4 MB</td>
-                            <td class="text-muted small">Сегодня, 14:20</td>
-                            <td class="text-end pe-4">
-                                <button class="btn btn-link text-primary p-0 me-2"><i class="bi bi-download"></i></button>
-                                <button class="btn btn-link text-danger p-0"><i class="bi bi-trash"></i></button>
-                            </td>
-                        </tr> -->
-                        {{ if not .Files }}
-                        <tr>
-                            <td colspan="4" class="text-center py-5 text-muted">
-                                <i class="bi bi-folder2-open fs-1 d-block mb-2"></i>
-                                <p>Файлов пока нет. Загрузите первый!</p>
+                            <td class="text-muted small">—</td>
+                            <td class="text-muted small" data-timestamp="{{.CreatedAt.Unix}}">{{.CreatedAt.Format "02.01.2006 15:04"}}</td>
+                            <td class="text-end pe-4 row-actions">
+                                <button type="button" class="btn btn-link text-primary p-0 me-2" data-folder-id="{{.ID}}" data-folder-name="{{.Name}}" onclick="openRenameFolderModal(this)" title="Переименовать"><i class="bi bi-pencil"></i></button>
+                                <button type="button" class="btn btn-link text-danger p-0" onclick="deleteFolder('{{.ID}}')" title="Удалить"><i class="bi bi-trash"></i></button>
                             </td>
                         </tr>
-                        {{ end }}
+                        {{end}}
+
+                        {{range .Files}}
+                        <tr class="browse-row file-row{{if isPreviewable .Extension}} file-row-preview{{end}}"
+                            data-file-id="{{.ID}}"
+                            data-file-name="{{.Name}}"
+                            data-preview-kind="{{previewKind .Extension}}"
+                            data-name="{{.Name}}"
+                            data-sort-name="{{lower .Name}}"
+                            data-sort-date="{{.CreatedAt.Unix}}"
+                            data-sort-size="{{.Size}}"
+                            {{if isPreviewable .Extension}}role="button" tabindex="0" title="Открыть предпросмотр"{{end}}>
+                            <td class="ps-4">
+                                {{if or (eq .Extension ".pdf") (eq .Extension ".PDF")}}
+                                    <i class="bi bi-file-earmark-pdf text-danger fs-5 me-2 align-middle"></i>
+                                {{else if or (eq .Extension ".doc") (eq .Extension ".docx") (eq .Extension ".DOC") (eq .Extension ".DOCX")}}
+                                    <i class="bi bi-file-earmark-word text-primary fs-5 me-2 align-middle"></i>
+                                {{else if or (eq .Extension ".xls") (eq .Extension ".xlsx") (eq .Extension ".XLS") (eq .Extension ".XLSX")}}
+                                    <i class="bi bi-file-earmark-excel text-success fs-5 me-2 align-middle"></i>
+                                {{else if or (eq .Extension ".jpg") (eq .Extension ".jpeg") (eq .Extension ".png") (eq .Extension ".gif") (eq .Extension ".webp") (eq .Extension ".JPG") (eq .Extension ".JPEG") (eq .Extension ".PNG") (eq .Extension ".GIF") (eq .Extension ".WEBP")}}
+                                    <i class="bi bi-file-earmark-image text-info fs-5 me-2 align-middle"></i>
+                                {{else if isPreviewable .Extension}}
+                                    <i class="bi bi-file-earmark-text text-secondary fs-5 me-2 align-middle"></i>
+                                {{else}}
+                                    <i class="bi bi-file-earmark text-secondary fs-5 me-2 align-middle"></i>
+                                {{end}}
+                                <span class="fw-medium">{{.Name}}</span>
+                            </td>
+                            <td class="text-muted small">
+                                {{if lt .Size 1024}}
+                                    {{.Size}} B
+                                {{else if lt .Size 1048576}}
+                                    {{printf "%.1f" (divideFloat .Size 1024)}} KB
+                                {{else if lt .Size 1073741824}}
+                                    {{printf "%.1f" (divideFloat .Size 1048576)}} MB
+                                {{else}}
+                                    {{printf "%.1f" (divideFloat .Size 1073741824)}} GB
+                                {{end}}
+                            </td>
+                            <td class="text-muted small" data-timestamp="{{.CreatedAt.Unix}}">{{.CreatedAt.Format "02.01.2006 15:04"}}</td>
+                            <td class="text-end pe-4 row-actions">
+                                {{if isPreviewable .Extension}}
+                                <button type="button" class="btn btn-link text-info p-0 me-2 btn-preview" data-file-id="{{.ID}}" data-file-name="{{.Name}}" data-preview-kind="{{previewKind .Extension}}" title="Просмотр"><i class="bi bi-eye"></i></button>
+                                {{end}}
+                                <button type="button" class="btn btn-link text-primary p-0 me-2" data-file-id="{{.ID}}" data-file-name="{{.Name}}" onclick="openRenameFileModal(this)" title="Переименовать"><i class="bi bi-pencil"></i></button>
+                                <a href="/download/{{.ID}}" class="btn btn-link text-success p-0 me-2" title="Скачать" onclick="event.stopPropagation()"><i class="bi bi-download"></i></a>
+                                <button type="button" class="btn btn-link text-danger p-0" onclick="event.stopPropagation(); deleteFile('{{.ID}}')" title="Удалить"><i class="bi bi-trash"></i></button>
+                            </td>
+                        </tr>
+                        {{end}}
+
+                        <tr id="emptyStateRow" class="{{if or (gt (len .Directories) 0) (gt (len .Files) 0)}}d-none{{end}}">
+                            <td colspan="4" class="ps-4 py-4 text-center text-muted">
+                                <i class="bi bi-inbox fs-4 me-2"></i>Нет файлов или папок
+                            </td>
+                        </tr>
+                        <tr id="noResultsRow" class="d-none">
+                            <td colspan="4" class="ps-4 py-4 text-center text-muted">
+                                <i class="bi bi-search fs-4 me-2"></i>Ничего не найдено
+                            </td>
+                        </tr>
                     </tbody>
                 </table>
             </div>
         </div>
     </div>
 </div>
+
+<div class="modal fade" id="createFolderModal" tabindex="-1" aria-labelledby="createFolderLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <form action="/create-folder" method="POST" class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="createFolderLabel">Создать новую папку</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрыть"></button>
+            </div>
+            <div class="modal-body">
+                {{if .CurrentDir}}
+                <input type="hidden" name="parentID" value="{{.CurrentDir.ID}}">
+                {{end}}
+                <input type="text" name="folderName" class="form-control" placeholder="Введите имя папки" required>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                <button type="submit" class="btn btn-primary">Создать</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="modal fade" id="renameFolderModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <form class="modal-content" onsubmit="renameFolder(event)">
+            <div class="modal-header">
+                <h5 class="modal-title">Переименовать папку</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрыть"></button>
+            </div>
+            <div class="modal-body">
+                <input type="text" id="newFolderName" class="form-control" placeholder="Новое имя папки" required>
+                <input type="hidden" id="renameFolderId">
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                <button type="submit" class="btn btn-primary">Сохранить</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="modal fade" id="renameFileModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <form class="modal-content" onsubmit="renameFile(event)">
+            <div class="modal-header">
+                <h5 class="modal-title">Переименовать файл</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрыть"></button>
+            </div>
+            <div class="modal-body">
+                <input type="text" id="newFileName" class="form-control" required>
+                <input type="hidden" id="renameFileId">
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                <button type="submit" class="btn btn-primary">Сохранить</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="modal fade" id="previewModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title text-truncate me-3" id="previewTitle">Просмотр</h5>
+                <a href="#" id="previewDownload" class="btn btn-sm btn-outline-success me-2"><i class="bi bi-download me-1"></i>Скачать</a>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрыть"></button>
+            </div>
+            <div class="modal-body p-0" id="previewBody">
+                <div class="text-center text-muted py-5">Загрузка...</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+let renameFolderModal = null;
+let renameFileModal = null;
+let previewModal = null;
+
+function showUploadError(message) {
+    const uploadZone = document.getElementById('uploadZone');
+    const uploadErrorText = document.getElementById('uploadErrorText');
+    const fileInput = document.getElementById('file');
+    if (!uploadZone || !uploadErrorText || !fileInput) return;
+
+    uploadErrorText.textContent = message;
+    uploadErrorText.classList.remove('d-none');
+    uploadZone.classList.add('is-invalid');
+    fileInput.classList.add('is-invalid');
+    uploadZone.classList.remove('shake');
+    void uploadZone.offsetWidth;
+    uploadZone.classList.add('shake');
+}
+
+function clearUploadError() {
+    const uploadZone = document.getElementById('uploadZone');
+    const uploadErrorText = document.getElementById('uploadErrorText');
+    const fileInput = document.getElementById('file');
+    if (!uploadZone || !uploadErrorText || !fileInput) return;
+
+    uploadErrorText.classList.add('d-none');
+    uploadErrorText.textContent = '';
+    uploadZone.classList.remove('is-invalid', 'shake');
+    fileInput.classList.remove('is-invalid');
+}
+
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+function openPreview(fileId, fileName, kind) {
+    const previewBody = document.getElementById('previewBody');
+    const previewTitle = document.getElementById('previewTitle');
+    const previewDownload = document.getElementById('previewDownload');
+
+    previewTitle.textContent = fileName;
+    previewDownload.href = `/download/${fileId}`;
+    previewBody.innerHTML = '<div class="text-center text-muted py-5"><div class="spinner-border spinner-border-sm me-2"></div>Загрузка...</div>';
+    previewModal.show();
+
+    const url = `/preview/${fileId}`;
+
+    if (kind === 'image') {
+        previewBody.innerHTML = `<div class="preview-image-wrap p-3 text-center"><img src="${url}" alt="${escapeHtml(fileName)}" class="img-fluid preview-image shadow-sm rounded"></div>`;
+        return;
+    }
+
+    if (kind === 'pdf') {
+        previewBody.innerHTML = `<iframe src="${url}" class="preview-frame" title="${escapeHtml(fileName)}"></iframe>`;
+        return;
+    }
+
+    if (kind === 'text') {
+        fetch(url)
+            .then(r => {
+                if (!r.ok) throw new Error('Не удалось загрузить');
+                return r.text();
+            })
+            .then(text => {
+                previewBody.innerHTML = `<pre class="preview-text p-3 mb-0">${escapeHtml(text)}</pre>`;
+            })
+            .catch(() => {
+                previewBody.innerHTML = '<div class="text-danger p-4 text-center">Не удалось открыть предпросмотр</div>';
+            });
+    }
+}
+
+function openPreviewFromElement(el) {
+    openPreview(el.dataset.fileId, el.dataset.fileName, el.dataset.previewKind);
+}
+
+function openRenameFolderModal(button) {
+    document.getElementById('renameFolderId').value = button.dataset.folderId;
+    document.getElementById('newFolderName').value = button.dataset.folderName || '';
+    renameFolderModal.show();
+}
+
+function openRenameFileModal(button) {
+    document.getElementById('renameFileId').value = button.dataset.fileId;
+    document.getElementById('newFileName').value = button.dataset.fileName || '';
+    renameFileModal.show();
+}
+
+function getBrowseRows() {
+    return Array.from(document.querySelectorAll('#filesTableBody tr.browse-row'));
+}
+
+function applySearchAndSort() {
+    const query = (document.getElementById('fileSearch')?.value || '').trim().toLowerCase();
+    const sortValue = document.getElementById('fileSort')?.value || 'date-desc';
+    const tbody = document.getElementById('filesTableBody');
+    const rows = getBrowseRows();
+
+    rows.forEach(row => {
+        const name = (row.dataset.name || '').toLowerCase();
+        row.dataset.hidden = query && !name.includes(query) ? '1' : '0';
+    });
+
+    const visible = rows.filter(r => r.dataset.hidden !== '1');
+    const hidden = rows.filter(r => r.dataset.hidden === '1');
+
+    visible.sort((a, b) => {
+        if (sortValue === 'name-asc') return a.dataset.sortName.localeCompare(b.dataset.sortName, 'ru');
+        if (sortValue === 'name-desc') return b.dataset.sortName.localeCompare(a.dataset.sortName, 'ru');
+        if (sortValue === 'size-desc') return Number(b.dataset.sortSize) - Number(a.dataset.sortSize);
+        if (sortValue === 'date-asc') return Number(a.dataset.sortDate) - Number(b.dataset.sortDate);
+        return Number(b.dataset.sortDate) - Number(a.dataset.sortDate);
+    });
+
+    [...visible, ...hidden].forEach(row => tbody.appendChild(row));
+    hidden.forEach(row => row.classList.add('d-none'));
+    visible.forEach(row => row.classList.remove('d-none'));
+
+    const countEl = document.getElementById('visibleCount');
+    if (countEl) countEl.textContent = visible.length ? `Показано: ${visible.length}` : '';
+
+    document.getElementById('noResultsRow')?.classList.toggle('d-none', visible.length > 0 || rows.length === 0);
+    document.getElementById('emptyStateRow')?.classList.toggle('d-none', rows.length > 0);
+}
+
+function initBrowseRows() {
+    document.querySelectorAll('.folder-row').forEach(row => {
+        const go = () => { window.location.href = row.dataset.href; };
+        row.addEventListener('click', e => {
+            if (e.target.closest('.row-actions')) return;
+            go();
+        });
+        row.addEventListener('keydown', e => {
+            if (e.key === 'Enter') go();
+        });
+    });
+
+    document.querySelectorAll('.file-row-preview').forEach(row => {
+        const open = () => openPreview(row.dataset.fileId, row.dataset.fileName, row.dataset.previewKind);
+        row.addEventListener('click', e => {
+            if (e.target.closest('.row-actions')) return;
+            open();
+        });
+        row.addEventListener('keydown', e => {
+            if (e.key === 'Enter') open();
+        });
+    });
+
+    document.querySelectorAll('.btn-preview').forEach(btn => {
+        btn.addEventListener('click', e => {
+            e.stopPropagation();
+            openPreviewFromElement(btn);
+        });
+    });
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    renameFolderModal = new bootstrap.Modal(document.getElementById('renameFolderModal'));
+    renameFileModal = new bootstrap.Modal(document.getElementById('renameFileModal'));
+    previewModal = new bootstrap.Modal(document.getElementById('previewModal'));
+
+    const uploadForm = document.getElementById('uploadForm');
+    const fileInput = document.getElementById('file');
+    const uploadZone = document.getElementById('uploadZone');
+
+    if (uploadForm && fileInput) {
+        uploadForm.addEventListener('submit', function(e) {
+            if (!fileInput.files || fileInput.files.length === 0) {
+                e.preventDefault();
+                showUploadError('Файл не выбран');
+                fileInput.focus();
+            }
+        });
+        fileInput.addEventListener('change', function() {
+            if (fileInput.files && fileInput.files.length > 0) clearUploadError();
+        });
+    }
+
+    if (uploadZone && uploadZone.dataset.uploadError) {
+        showUploadError(uploadZone.dataset.uploadError);
+        delete uploadZone.dataset.uploadError;
+    }
+
+    document.getElementById('fileSearch')?.addEventListener('input', applySearchAndSort);
+    document.getElementById('fileSort')?.addEventListener('change', applySearchAndSort);
+
+    initBrowseRows();
+    applySearchAndSort();
+});
+
+function renameFolder(event) {
+    event.preventDefault();
+    const folderId = document.getElementById('renameFolderId').value;
+    const newName = document.getElementById('newFolderName').value;
+    const formData = new FormData();
+    formData.append('newName', newName);
+
+    fetch(`/rename-folder/${folderId}`, { method: 'POST', body: formData })
+        .then(r => r.json())
+        .then(data => {
+            if (data.error) alert('Ошибка: ' + data.error);
+            else location.reload();
+        })
+        .catch(() => alert('Ошибка при переименовании папки'));
+    renameFolderModal.hide();
+}
+
+function renameFile(event) {
+    event.preventDefault();
+    const fileId = document.getElementById('renameFileId').value;
+    const newName = document.getElementById('newFileName').value;
+    const formData = new FormData();
+    formData.append('newName', newName);
+
+    fetch(`/rename-file/${fileId}`, { method: 'POST', body: formData })
+        .then(r => r.json())
+        .then(data => {
+            if (data.error) alert('Ошибка: ' + data.error);
+            else location.reload();
+        })
+        .catch(() => alert('Ошибка при переименовании файла'));
+    renameFileModal.hide();
+}
+
+function deleteFile(fileId) {
+    if (!confirm('Удалить этот файл?')) return;
+    fetch(`/delete-file/${fileId}`, { method: 'POST' })
+        .then(r => r.json())
+        .then(data => {
+            if (data.error) alert('Ошибка: ' + data.error);
+            else location.reload();
+        })
+        .catch(() => alert('Ошибка при удалении файла'));
+}
+
+function deleteFolder(folderId) {
+    if (!confirm('Удалить эту папку?')) return;
+    fetch(`/delete-folder/${folderId}`, { method: 'POST' })
+        .then(r => r.json())
+        .then(data => {
+            if (data.error) alert('Ошибка: ' + data.error);
+            else location.reload();
+        })
+        .catch(() => alert('Ошибка при удалении папки'));
+}
+</script>
 
 {{ template "footer" . }}

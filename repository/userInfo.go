@@ -2,72 +2,51 @@ package repository
 
 import (
 	"CloudStorage/models"
-	"context"
-	"fmt"
 
-	"github.com/jackc/pgx/v5"
 	"golang.org/x/crypto/bcrypt"
 )
 
-var Ctx = context.Background()
-
-func AddUser(form models.UserPass) {
-	conn, _ := pgx.Connect(Ctx, "postgresql://postgres:6852@localhost:5432/cloud_storage")
-	if err := conn.Ping(Ctx); err != nil {
-		fmt.Println("не удалось подключиться к бд")
-	} else {
-		fmt.Println("бд успешно подключена!")
-	}
-	SqlExec := `
-	INSERT INTO users (username, password)
-	VALUES ($1, $2)
-	`
-	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(form.Password), bcrypt.DefaultCost)
+func GetUserID(username string) (int, error) {
+	var userID int
+	err := DB.QueryRow(Ctx, "SELECT id FROM users WHERE username=$1", username).Scan(&userID)
 	if err != nil {
-		fmt.Println(err)
-		return
+		return 0, err
 	}
-	_, err = conn.Exec(Ctx, SqlExec, form.Username, hashedPassword)
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
+	return userID, nil
 }
 
-func LoginUser(form models.UserPass) bool {
-	var tmp models.UserPass
-	conn, _ := pgx.Connect(Ctx, "postgresql://postgres:6852@localhost:5432/cloud_storage")
-	SqlQuery := `
-	SELECT * FROM users 
-	WHERE username=$1
-	`
-	rows, _ := conn.Query(Ctx, SqlQuery, form.Username)
-	defer rows.Close()
-	for rows.Next() {
-		rows.Scan(&tmp.Username, &tmp.Password)
+func AddUser(form models.UserPass) error {
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(form.Password), bcrypt.DefaultCost)
+	if err != nil {
+		return err
 	}
-	fmt.Println("Для входа получены следующие значения", tmp)
-	if CheckUser(form) == true && bcrypt.CompareHashAndPassword([]byte(tmp.Password), []byte(form.Password)) == nil {
-		return true
-	} else {
-		return false
+
+	SqlExec := `INSERT INTO users (username, password_hash) VALUES ($1, $2)`
+	_, err = DB.Exec(Ctx, SqlExec, form.Username, hashedPassword)
+	return err
+}
+
+func LoginUser(form models.UserPass) (int, bool) {
+	var userID int
+	var dbPasswordHash string
+
+	SqlQuery := `SELECT id, password_hash FROM users WHERE username=$1`
+	err := DB.QueryRow(Ctx, SqlQuery, form.Username).Scan(&userID, &dbPasswordHash)
+	if err != nil {
+		return 0, false
 	}
+
+	err = bcrypt.CompareHashAndPassword([]byte(dbPasswordHash), []byte(form.Password))
+	if err != nil {
+		return 0, false
+	}
+	return userID, true
 }
 
 func CheckUser(form models.UserPass) bool {
-	var tmp models.UserPass
-	conn, _ := pgx.Connect(Ctx, "postgresql://postgres:6852@localhost:5432/cloud_storage")
-	SqlQuery := `
-	SELECT username FROM users 
-	WHERE username=$1
-	`
-	rows, _ := conn.Query(Ctx, SqlQuery, form.Username)
-	defer rows.Close()
-	for rows.Next() {
-		rows.Scan(&tmp.Username)
-	}
-	if tmp.Username != "" {
-		return true
-	}
-	return false
+	var username string
+	SqlQuery := `SELECT username FROM users WHERE username=$1`
+	err := DB.QueryRow(Ctx, SqlQuery, form.Username).Scan(&username)
+
+	return err == nil && username != ""
 }

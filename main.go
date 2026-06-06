@@ -1,39 +1,37 @@
 package main
 
 import (
+	"CloudStorage/config"
 	"CloudStorage/handlers"
+	"CloudStorage/repository"
 	"fmt"
+	"strings"
+	"text/template"
 
-	"github.com/gin-contrib/sessions"
-	"github.com/gin-contrib/sessions/cookie"
 	"github.com/gin-gonic/gin"
 )
 
 func main() {
 	router := gin.Default()
-	router.LoadHTMLGlob("templates/*")
-	store := cookie.NewStore([]byte("secretkey"))
-	router.Use(sessions.Sessions("mysession", store))
 
-	//----unsecure-ROUTES-------
-	router.GET("/", func(ctx *gin.Context) {
-		ctx.Redirect(302, "/dashboard")
+	router.SetFuncMap(template.FuncMap{
+		"divideFloat": func(a int64, b int64) float64 {
+			return float64(a) / float64(b)
+		},
+		"formatBytes":   handlers.FormatBytes,
+		"isPreviewable": handlers.IsPreviewable,
+		"previewKind":   handlers.PreviewKind,
+		"lower":         strings.ToLower,
 	})
 
-	router.GET("/registration", handlers.RenderReg)
-	router.POST("/registration", handlers.RegLogic)
+	router.LoadHTMLGlob("templates/*")
 
-	router.GET("/login", handlers.RenderLogin)
-	router.POST("/login", handlers.LoginLogic)
+	// Инициализируем БД (Пул соединений)
+	repository.InitDB()
 
-	router.GET("/logout", handlers.Logout)
-	//----secure-ROUTES--------
-	authorized := router.Group("/")
-	authorized.Use(handlers.AuthRequired())
-	{
-		authorized.GET("/dashboard", handlers.RenderDashboard)
-	}
+	minioClient := repository.InitMinio()
+	handlers.RegisterRoutes(router, minioClient)
 
-	fmt.Println("Запуск сервера")
-	router.Run(":9091")
+	fmt.Println("Запуск сервера на порту", config.AppPort)
+	router.Run(":" + config.AppPort)
 }
