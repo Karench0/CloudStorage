@@ -17,6 +17,7 @@ docker compose up -d
 | Postgres | 5432  | метаданные (пользователи, папки, файлы) |
 | MinIO API | **9000** | хранение файлов (использует приложение) |
 | MinIO Console | **9001** | веб-интерфейс в браузере |
+| App | **9091** | Само приложение |
 
 
 Веб-консоль MinIO:
@@ -41,12 +42,6 @@ curl -s http://127.0.0.1:9000/minio/health/live
 ```bash
 docker compose up -d minio
 docker logs cloud_storage_minio
-```
-
-## Запуск приложения
-
-```bash
-go run .
 ```
 
 Приложение: **http://localhost:9091**
