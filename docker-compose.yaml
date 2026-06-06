@@ -1,9 +1,6 @@
-version: '3.8'
-
 services:
   db:
     image: postgres:15
-    container_name: my_postgres_db
     restart: always
     environment:
       POSTGRES_USER: postgres        
@@ -12,12 +9,10 @@ services:
     ports:
       - "5432:5432"
     volumes:
-
       - postgres_data:/var/lib/postgresql/data
 
   minio:
     image: minio/minio
-    container_name: cloud_storage_minio
     restart: unless-stopped
     ports:
       - "9000:9000"   
@@ -28,6 +23,17 @@ services:
     command: server /data --console-address ":9001"
     volumes:
       - minio_data:/data
+
+  app:
+    build: .
+    ports:
+      - "9091:9091"
+    environment:
+      DATABASE_URL: "postgresql://postgres:6852@db:5432/cloud_storage"
+      MINIO_ENDPOINT: "minio:9000"
+    depends_on:
+      - db
+      - minio
 
 volumes:
   postgres_data:
