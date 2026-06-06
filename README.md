@@ -15,7 +15,6 @@ docker compose up -d
 | Сервис   | Порт  | Назначение |
 |----------|-------|------------|
 | Postgres | 5432  | метаданные (пользователи, папки, файлы) |
-| MinIO API | **9000** | хранение файлов (использует приложение) |
 | MinIO Console | **9001** | веб-интерфейс в браузере |
 | App | **9091** | Само приложение |
 
@@ -25,17 +24,6 @@ docker compose up -d
 - URL: **http://localhost:9001**
 - Логин: `minioadmin`
 - Пароль: `minioadminpassword`
-
-(те же значения, что в `docker-compose.yaml` и `config/config.go`.)
-
-Проверка, что MinIO запущен:
-
-```bash
-docker compose ps
-curl -s http://127.0.0.1:9000/minio/health/live
-```
-
-Должен вернуть пустой ответ с кодом `200`.
 
 Если контейнер не запущен:
 
