@@ -81,6 +81,11 @@ func RegLogic(ctx *gin.Context) {
 		return
 	}
 
+	if len(form.Password) < 6 {
+		renderAuthError(ctx, "registration.html", "Пароль должен содержать минимум 6 символов")
+		return
+	}
+
 	if repository.CheckUser(form) {
 		renderAuthError(ctx, "registration.html", "Пользователь с таким именем уже существует")
 		return
