@@ -18,11 +18,25 @@
                     
                     <div class="mb-4">
                         <label class="form-label text-muted small fw-bold">Пароль</label>
-                        <input type="password" name="password" class="form-control" required minlength="6" placeholder="Минимум 6 символов">
+                        <input type="password" name="password" id="passwordInput" class="form-control" required minlength="6" placeholder="Минимум 6 символов">
+                        <small id="passwordHint" class="text-danger d-none mt-1">Пароль должен содержать минимум 6 символов</small>
                     </div>
                     
                     <button type="submit" class="btn btn-primary w-100 fw-bold py-2">Зарегистрироваться</button>
                 </form>
+                
+                <script>
+                    const passwordInput = document.getElementById('passwordInput');
+                    const passwordHint = document.getElementById('passwordHint');
+                    
+                    passwordInput.addEventListener('input', function() {
+                        if (this.value.length < 6 && this.value.length > 0) {
+                            passwordHint.classList.remove('d-none');
+                        } else {
+                            passwordHint.classList.add('d-none');
+                        }
+                    });
+                </script>
                 
                 <div class="text-center mt-4">
                     <span class="text-muted small">Уже есть аккаунт?</span>
